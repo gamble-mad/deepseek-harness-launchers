@@ -1,0 +1,14 @@
+# Storage backups — large, machine-local snapshots, not source
+storages-backup-*/
+
+# Loose icon/image sources at repo root — duplicates of the canonical
+# tracked copies under assets/icons/
+/*.ico
+/*.png
+
+# Icon-build utility scripts — not part of harness operation
+/make-*.ps1
+/make-*.ps1.bak
+
+# Personal operating notes
+/STEADY-STATE-OPERATING-NOTE.txt

@@ -1,0 +1,25 @@
+# storage-root-per-window.patch.yml
+#
+# WHAT: Overrides the `storage-json` loader row's `root` so that the JSON
+#       storage backend (which backs `storage-domain` -> `workspace` and
+#       `session-projection-cache`) writes to a PER-WINDOW directory instead of
+#       the single shared C:\Users\mgamb\.dsh\storages.
+#
+# WHY:  dsh-storage-json has no cross-process write locking: it republishes the
+#       whole file on every write, so two dsh windows sharing one storages root
+#       can clobber each other's workspace.json (last-write-wins), silently
+#       erasing a workspace registration and its sessionIds account. Giving each
+#       launcher its own root removes that shared mutable file. Decision record:
+#       C:\Users\mgamb\.claude\plans\enter-plan-mode-do-compressed-stroustrup.md
+#
+# HOW:  Each launcher sets $env:DSH_STORAGE_ROOT to its own path before calling
+#       dsh, and passes --patch <this file>. If DSH_STORAGE_ROOT is unset the
+#       expression falls back to dshHomePath('storages'), i.e. today's shared
+#       behavior, so an un-parameterized invocation is unchanged.
+#
+# SCOPE: storage-json.root ONLY. Session logs (session-persistence-jsonl) are
+#        deliberately left shared. Do not add other rows here.
+
+- id: storage-json
+  config:
+    root: !!js process.env.DSH_STORAGE_ROOT ?? dshHomePath('storages')
