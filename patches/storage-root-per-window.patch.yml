@@ -9,8 +9,7 @@
 #       whole file on every write, so two dsh windows sharing one storages root
 #       can clobber each other's workspace.json (last-write-wins), silently
 #       erasing a workspace registration and its sessionIds account. Giving each
-#       launcher its own root removes that shared mutable file. Decision record:
-#       C:\Users\mgamb\.claude\plans\enter-plan-mode-do-compressed-stroustrup.md
+#       launcher its own root removes that shared mutable file.
 #
 # HOW:  Each launcher sets $env:DSH_STORAGE_ROOT to its own path before calling
 #       dsh, and passes --patch <this file>. If DSH_STORAGE_ROOT is unset the
