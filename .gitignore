@@ -1,14 +1,37 @@
-# Storage backups — large, machine-local snapshots, not source
-storages-backup-*/
+﻿# ---- secrets: never commit ----
+.credentials.yaml
+*.credentials.yaml
+.env
+.env.*
+*.key
+*.pem
+*.pfx
+*_token
+*secret*
+*.secret.*
 
-# Loose icon/image sources at repo root — duplicates of the canonical
-# tracked copies under assets/icons/
-/*.ico
-/*.png
+# ---- dsh runtime state (belongs in DSH_HOME, not here) ----
+.dsh/
+storages/
+storages-w*/
+settings.yaml
+workspace.json
+session_projcache.json
+*.jsonl
+*.jsonl.zstd
+sessions/
 
-# Icon-build utility scripts — not part of harness operation
-/make-*.ps1
-/make-*.ps1.bak
+# ---- OS / editor cruft ----
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
 
-# Personal operating notes
-/STEADY-STATE-OPERATING-NOTE.txt
+# ---- logs / scratch ----
+*.log
+*.tmp
+tmp/
+scratch/
