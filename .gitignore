@@ -35,3 +35,7 @@ desktop.ini
 *.tmp
 tmp/
 scratch/
+# ---- local-only neighbours of this repo (not launcher project files) ----
+storages-backup-*/
+TradingDesk/
+deepseek-harness-launchers/

@@ -1,0 +1,90 @@
+DEEPSEEK HARNESS - FOUR-WINDOW MODE - STEADY-STATE OPERATING NOTE
+Written 2026-09-03, after Phase 4 (per-window storage root) and its cleanup pass.
+
+
+1. LOAD-BEARING FILES - INCLUDE THESE IN BACKUPS
+
+   The four launchers now depend on all of the following. These are live state and
+   configuration, not scratch:
+
+     B:\AI\DeepSeekHarness\patches\storage-root-per-window.patch.yml
+     C:\Users\mgamb\.dsh\storages-w1
+     C:\Users\mgamb\.dsh\storages-w2
+     C:\Users\mgamb\.dsh\storages-w3
+     C:\Users\mgamb\.dsh\storages-w4
+
+   Back them up together with C:\Users\mgamb\.dsh\ itself.
+
+
+2. DO NOT REMOVE OR RENAME THE PATCH FILE
+
+   Each launcher passes the patch file explicitly with --patch. A named overlay that
+   cannot be read is treated as a misconfiguration and fails loud, by design - it is
+   not treated as "no overlay". Renaming, moving, deleting, or making that file
+   unreadable will therefore hard-fail ALL FOUR windows at boot.
+
+   If the file must move, update the --patch path in all four launchers in the same
+   change.
+
+
+3. USE THE SHORTCUTS - DO NOT MIX IN BARE TERMINAL LAUNCHES
+
+   The four Desktop shortcuts are safe: each launcher sets DSH_STORAGE_ROOT to its own
+   per-window directory before invoking dsh.
+
+   A bare terminal invocation (for example: dsh --profile web) that does NOT set
+   DSH_STORAGE_ROOT falls back to the shared root C:\Users\mgamb\.dsh\storages by
+   design, so an un-parameterized command still behaves as it always did. That fallback
+   is the old shared file with no cross-process write locking. Do not run bare terminal
+   instances alongside the four-window launcher mode, and never run two of them at once.
+
+
+4. EACH WINDOW HAS ITS OWN SIDEBAR - THIS IS INTENTIONAL
+
+   Workspace grouping, workspace order, and archive state are now per-window. A
+   workspace registered, reordered, or archived in one window does not appear in the
+   others. Each window keeps its own workspace ids, so the same folder can carry a
+   different workspace id in each window. That is expected, not a fault, and the ids do
+   not need reconciling.
+
+   Session logs remain SHARED, under C:\Users\mgamb\.dsh\sessions. A session created in
+   another window is still present and openable here - it simply shows as Ungrouped
+   rather than filed under its workspace. Nothing is lost.
+
+
+5. PERMANENT RULE - ONE WINDOW PER WORKSPACE FOR MUTATING WORK
+
+   Do not run mutating work against the same filesystem workspace from more than one
+   window at a time.
+
+   Per-window registry isolation removed the workspace-index clobber (the defect where
+   one window's write silently erased a workspace another window had just registered).
+   It does NOT prevent shared-file or concurrent-agent edit races: all windows run local
+   shell and filesystem tools as the same user against the same disk, with no locking
+   and no awareness of each other. Two agents editing one file is still last-write-wins.
+
+   For ordinary parallel work, one server with multiple browser tabs remains the safer
+   mode. Four windows are the deliberate isolation mode, not the default.
+
+
+6. KEEP BOTH STORAGE BACKUPS
+
+     B:\AI\DeepSeekHarness\storages-backup-20260903-130459
+     B:\AI\DeepSeekHarness\storages-backup-20260903-134103
+
+   Do not delete either. C:\Users\mgamb\.dsh\storages is also retained, unmodified, as
+   the revert path: removing DSH_STORAGE_ROOT and --patch from the four launchers
+   returns the harness to its previous shared-root behavior with that state intact.
+
+
+7. WHAT IS DELIBERATELY NOT CHANGED
+
+   Fixed ports 3080 / 3081 / 3082 / 3083 - one per window. No dynamic ports.
+   No port preflight; a port collision already fails fast with a clear bind diagnostic
+   and the launcher holds the window open.
+   dsh.cmd is kept (dsh.ps1 measured as noise); launches are not staggered (measured as
+   pure added wait).
+   DSH_HOME stays single and shared. Session logs stay shared and are not redirected.
+   Shortcut WorkingDirectory is C:\Users\mgamb\dsh-workdir, deliberately off OneDrive.
+   Full-text session search stays disabled (session-query-sqlite pinned to ':memory:'
+   with openAt 'never'); enabling it against a real path is unsafe across processes.

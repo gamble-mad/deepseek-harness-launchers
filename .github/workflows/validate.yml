@@ -1,11 +1,15 @@
-﻿# PowerShell + JSON syntax check for deepseek-harness-launchers
+# Syntax check for deepseek-harness-launchers.
+#
+# Uses the real PowerShell parser and FAILS on parse errors. (The previous
+# version called PSParser::Tokenize with a discarded [ref]$null error list,
+# which never fails - it was green for any input.)
 name: Validate Scripts
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
   workflow_dispatch:
 
 jobs:
@@ -14,41 +18,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate PowerShell scripts
+      - name: Parse every PowerShell script
         shell: pwsh
         run: |
-          $errors = @()
+          $failed = $false
           Get-ChildItem -Recurse -Filter "*.ps1" | ForEach-Object {
-            $content = Get-Content $_.FullName -Raw
-            try {
-              [System.Management.Automation.PSParser]::Tokenize($content, [ref]$null) | Out-Null
-            } catch {
-              $errors += "$($_.Name): $($_.Exception.Message)"
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              foreach ($e in $errors) {
+                Write-Host "::error file=$($_.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              }
+            } else {
+              Write-Host "ok  $($_.FullName)"
             }
           }
-          if ($errors.Count -gt 0) {
-            Write-Error "Syntax errors found:"
-            $errors | ForEach-Object { Write-Error $_ }
-            exit 1
-          } else {
-            Write-Host "✅ All PowerShell scripts passed!"
-          }
+          if ($failed) { exit 1 }
 
-      - name: Validate JSON files
+      - name: Parse the patch overlay and workflow YAML
         shell: pwsh
         run: |
-          $errors = @()
-          Get-ChildItem -Recurse -Filter "*.json" | ForEach-Object {
+          Install-Module powershell-yaml -Force -Scope CurrentUser -AcceptLicense
+          $failed = $false
+          Get-ChildItem -Recurse -Include "*.yml","*.yaml" | ForEach-Object {
             try {
-              Get-Content $_.FullName -Raw | ConvertFrom-Json | Out-Null
+              # The patch overlay uses a custom !!js tag that a generic YAML
+              # parser cannot evaluate; strip the tag so structure is still checked.
+              $text = (Get-Content $_.FullName -Raw) -replace '!!js\s+', ''
+              ConvertFrom-Yaml $text | Out-Null
+              Write-Host "ok  $($_.FullName)"
             } catch {
-              $errors += "$($_.Name): $($_.Exception.Message)"
+              $failed = $true
+              Write-Host "::error file=$($_.FullName)::$($_.Exception.Message)"
             }
           }
-          if ($errors.Count -gt 0) {
-            Write-Error "Invalid JSON found:"
-            $errors | ForEach-Object { Write-Error $_ }
-            exit 1
-          } else {
-            Write-Host "✅ All JSON files are valid!"
+          if ($failed) { exit 1 }
+
+      - name: Launchers share one body and pin no absolute paths
+        shell: pwsh
+        run: |
+          $launchers = Get-ChildItem "launchers" -Filter "Start DeepSeek Harness - Window *.ps1"
+          if ($launchers.Count -ne 4) { Write-Host "::error::expected 4 window launchers, found $($launchers.Count)"; exit 1 }
+          $failed = $false
+          foreach ($l in $launchers) {
+            $c = Get-Content $l.FullName -Raw
+            if ($c -notmatch "launcher-common\.ps1") { Write-Host "::error file=$($l.FullName)::does not dot-source launcher-common.ps1"; $failed = $true }
+            if ($c -match "[A-Z]:\\") { Write-Host "::error file=$($l.FullName)::contains an absolute drive path"; $failed = $true }
           }
+          if ($failed) { exit 1 }
