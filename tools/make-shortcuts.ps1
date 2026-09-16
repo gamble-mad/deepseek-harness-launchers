@@ -4,11 +4,18 @@
 #
 #   -Desktop       where to write the .lnk files (default: the user's Desktop
 #                  folder, which is the OneDrive Desktop when that redirection is on)
-#   -IconStore     where icon files are copied for the shortcuts to reference
-#                  (default: %LOCALAPPDATA%\DeepSeekHarness - outside OneDrive so
-#                  Files On-Demand can never dehydrate them)
-#   -NoCacheReset  skip the Explorer icon-cache rebuild (Explorer is restarted
-#                  during the rebuild; open Explorer windows close and reopen)
+#   -IconStore       where the shortcuts read their icons from (default: the
+#                    repo's assets\icons on B:, a plain fixed drive: not OneDrive,
+#                    so Files On-Demand cannot dehydrate it, and not AppData, so a
+#                    process running under an MSIX/sandbox AppData redirection
+#                    still sees the same file). The earlier %LOCALAPPDATA% store
+#                    failed exactly that way: an Explorer restarted from inside a
+#                    sandbox saw a virtualised AppData without the icons and drew
+#                    blank pages.
+#   -ResetIconCache  also rebuild Explorer's icon cache (Explorer is stopped and
+#                    restarted). Run this ONLY from the operator's own shell: an
+#                    Explorer started from a sandboxed process inherits the
+#                    sandbox and mis-renders icons until the operator restarts it.
 #
 # Shortcut names are "DS Harness N.lnk" (the operator's names). The earlier
 # "DeepSeek Harness - Window N - Qty N.lnk" names, if present, are removed so
@@ -20,8 +27,8 @@
 
 param(
     [string]$Desktop   = [Environment]::GetFolderPath('Desktop'),
-    [string]$IconStore = (Join-Path $env:LOCALAPPDATA 'DeepSeekHarness'),
-    [switch]$NoCacheReset
+    [string]$IconStore = (Join-Path (Split-Path -Parent $PSScriptRoot) 'assets\icons'),
+    [switch]$ResetIconCache
 )
 
 Set-StrictMode -Version Latest
@@ -55,7 +62,9 @@ foreach ($n in 1..4) {
     foreach ($p in @($script, $srcIcon)) {
         if (-not (Test-Path -LiteralPath $p)) { throw "Missing: $p" }
     }
-    Copy-Item -LiteralPath $srcIcon -Destination $dstIcon -Force
+    if ((Resolve-Path -LiteralPath $srcIcon).Path -ne [IO.Path]::GetFullPath($dstIcon)) {
+        Copy-Item -LiteralPath $srcIcon -Destination $dstIcon -Force
+    }
     if (Test-Path -LiteralPath $oldLnk) { Remove-Item -LiteralPath $oldLnk -Force; Write-Host "Removed old-name duplicate $oldLnk" }
 
     $lnk = $sh.CreateShortcut($lnkPath)
@@ -74,8 +83,9 @@ foreach ($n in 1..4) {
 }
 [Runtime.InteropServices.Marshal]::ReleaseComObject($sh) | Out-Null
 
-if ($NoCacheReset) {
-    Write-Host 'Done (icon cache not reset; pass without -NoCacheReset if the Desktop shows blank icons).'
+if (-not $ResetIconCache) {
+    Write-Host 'Done. If the Desktop still shows blank pages: Ctrl+Shift+Esc, Windows Explorer, Restart'
+    Write-Host '(or re-run with -ResetIconCache from your own shell, never from a sandboxed one).'
     exit 0
 }
 
