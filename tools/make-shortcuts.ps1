@@ -22,6 +22,7 @@
 # the Desktop never carries two shortcuts for one window. Nothing else on the
 # Desktop is touched.
 #
+# "DS Harness N" starts windows 1..N (Qty N), each in its own console.
 # Channel map, fixed: window N -> launcher "Window N - Qty N" -> 127.0.0.1:(3079+N)
 # -> storage ~\.dsh\storages-wN -> icon deepseek-harness-window-N.ico.
 
@@ -73,7 +74,7 @@ foreach ($n in 1..4) {
     $lnk.WorkingDirectory = $workDir
     $lnk.IconLocation     = "$dstIcon,0"
     $lnk.WindowStyle      = 1
-    $lnk.Description      = "DeepSeek Harness window $n - http://127.0.0.1:$port - storages-w$n"
+    $lnk.Description      = "Starts DeepSeek Harness windows 1..$n (this one: http://127.0.0.1:$port, storages-w$n)"
     $lnk.Save()
 
     Write-Host ("Wrote {0}" -f $lnkPath)

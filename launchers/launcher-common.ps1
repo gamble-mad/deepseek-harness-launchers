@@ -1,6 +1,7 @@
 # launcher-common.ps1 - shared body for the four window launchers.
 #
-# Each "Start DeepSeek Harness - Window N - Qty N.ps1" sets $Window and $Port,
+# Each "Start DeepSeek Harness - Window N - Qty N.ps1" sets $Window and $Port and,
+# per its "Qty N", first brings up windows 1..N-1 in their own consoles;
 # then dot-sources this file. Everything machine-specific is derived here from
 # the repo location and the user profile, so the launchers carry no absolute
 # paths of their own.
@@ -72,6 +73,31 @@ if ($listening) {
     if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) {
         Stop-WithMessage "port $Port is still held after ending PID $holderId."
     }
+}
+
+# "Qty N": launcher N brings up windows 1..N. Windows 1..N-1 each get their own
+# console (their own launcher, so they carry the same preflight and log); one
+# already listening on its port is left alone. This console then runs window N.
+$isQtyChild = ($env:DSH_QTY_CHILD -eq '1')
+if (-not $isQtyChild) {
+    # DSH_QTY_CHILD is inherited by the consoles started here and stops them
+    # fanning out again (window 3 must not start 1 and 2 a second time).
+    $env:DSH_QTY_CHILD = '1'
+    for ($k = 1; $k -lt $Window; $k++) {
+        $kPort = 3079 + $k
+        if (Get-NetTCPConnection -LocalPort $kPort -State Listen -ErrorAction SilentlyContinue) {
+            Write-Host "  window $k already running on ${BindHost}:$kPort - left as is"
+            continue
+        }
+        $kScript = Join-Path $PSScriptRoot "Start DeepSeek Harness - Window $k - Qty $k.ps1"
+        if (-not (Test-Path -LiteralPath $kScript)) { Stop-WithMessage "launcher for window $k missing: $kScript" }
+        Start-Process -FilePath (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+            -ArgumentList '-ExecutionPolicy', 'Bypass', '-NoProfile', '-File', "`"$kScript`"" `
+            -WorkingDirectory $env:USERPROFILE
+        Write-Host "  started window $k in its own console (${BindHost}:$kPort)"
+        Start-Sleep -Seconds 1
+    }
+    Remove-Item Env:DSH_QTY_CHILD -ErrorAction SilentlyContinue
 }
 
 $Host.UI.RawUI.WindowTitle = "DeepSeek Harness - Window $Window - ${BindHost}:$Port"
