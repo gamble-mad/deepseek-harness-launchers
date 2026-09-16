@@ -49,18 +49,44 @@ if (-not (Test-Path -LiteralPath $patchFile)) { Stop-WithMessage "patch overlay 
 if (-not (Test-Path -LiteralPath $storageRoot)) { Stop-WithMessage "per-window storage root missing: $storageRoot (restore it from backup; do not point this window at the shared root)." }
 if ($null -eq (Get-Command node -ErrorAction SilentlyContinue)) { Stop-WithMessage 'node is not on PATH; dsh.cmd needs it.' }
 
+# Each window owns one loopback port: window N -> 127.0.0.1:(3079+N). A port
+# still held after a window was closed is almost always a dsh/node process the
+# console closed around but did not end. Name the holder and offer to end it;
+# never end anything without the operator's key press.
+$BindHost = '127.0.0.1'
 $listening = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-if ($listening) { Stop-WithMessage "port $Port is already in use - this window is probably already running." }
+if ($listening) {
+    $holderId = ($listening | Select-Object -First 1).OwningProcess
+    $holder   = Get-CimInstance Win32_Process -Filter "ProcessId = $holderId" -ErrorAction SilentlyContinue
+    Write-Host ''
+    Write-Host "Port $Port is already in use." -ForegroundColor Yellow
+    if ($null -ne $holder) {
+        Write-Host "  held by PID $holderId  $($holder.Name)"
+        Write-Host "  $($holder.CommandLine)"
+    }
+    Write-Host "  If a Harness window $Window is open, use that one instead of starting a second."
+    $answer = Read-Host "End PID $holderId and start this window here? [y/N]"
+    if ($answer -notmatch '^[Yy]$') { exit 0 }
+    Stop-Process -Id $holderId -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) {
+        Stop-WithMessage "port $Port is still held after ending PID $holderId."
+    }
+}
 
-$Host.UI.RawUI.WindowTitle = "DeepSeek Harness - Window $Window - :$Port"
-Write-Host "DeepSeek Harness window $Window on port $Port" -ForegroundColor Cyan
+$Host.UI.RawUI.WindowTitle = "DeepSeek Harness - Window $Window - ${BindHost}:$Port"
+Write-Host "DeepSeek Harness window $Window" -ForegroundColor Cyan
+Write-Host "  web:     http://${BindHost}:$Port"
 Write-Host "  dsh:     $dshCmd"
 Write-Host "  patch:   $patchFile"
 Write-Host "  storage: $storageRoot"
+Write-Host "  (first bind can take 15-20 s while node warms its compile cache)"
 Write-Host ''
 
 $env:DSH_STORAGE_ROOT = $storageRoot
-& $dshCmd --profile web --patch $patchFile --port $Port
+# Option order matters to dsh: --patch is a global option and must come before
+# the web-profile options (--host, --port), or dsh reports "unknown option".
+& $dshCmd --profile web --patch $patchFile --host $BindHost --port $Port
 $code = $LASTEXITCODE
 
 # Ctrl+C / closing the window returns these; they are normal shutdowns, not faults.
