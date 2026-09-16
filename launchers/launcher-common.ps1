@@ -81,6 +81,8 @@ Write-Host "  dsh:     $dshCmd"
 Write-Host "  patch:   $patchFile"
 Write-Host "  storage: $storageRoot"
 Write-Host "  (first bind can take 15-20 s while node warms its compile cache)"
+Write-Host "  open the web address above in your browser yourself; this launcher no longer opens one."
+Write-Host "  This console IS window $Window - closing it stops the harness on port $Port."
 Write-Host ''
 
 $env:DSH_STORAGE_ROOT = $storageRoot
@@ -98,7 +100,11 @@ Write-Host ''
 # they are redirected; under ErrorActionPreference=Stop a single warning line
 # from dsh would end this script. Relax it for the duration of the run only.
 $ErrorActionPreference = 'Continue'
-& $dshCmd --profile web --patch $patchFile --host $BindHost --port $Port 2>&1 |
+# --no-open: dsh would otherwise tell the default browser to open the URL on
+# every launch, and a browser that restores its session (Comet, Brave, Edge)
+# then piles up windows. The operator opens 127.0.0.1:<port> once and keeps
+# the tab; the URL is printed above and in the log.
+& $dshCmd --profile web --patch $patchFile --host $BindHost --port $Port --no-open 2>&1 |
     ForEach-Object { $line = "$_"; Write-Host $line; Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8 }
 $code = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
