@@ -84,15 +84,35 @@ Write-Host "  (first bind can take 15-20 s while node warms its compile cache)"
 Write-Host ''
 
 $env:DSH_STORAGE_ROOT = $storageRoot
+
+# Everything dsh prints is also appended to a per-window log, so a window that
+# dies while nobody is watching still leaves its last lines behind.
+$logFile = Join-Path $env:USERPROFILE ".dsh\launcher-w$Window.log"
+Add-Content -LiteralPath $logFile -Encoding UTF8 -Value ("--- {0}  window {1}  port {2}  start" -f (Get-Date -Format s), $Window, $Port)
+Write-Host "  log:     $logFile"
+Write-Host ''
+
 # Option order matters to dsh: --patch is a global option and must come before
 # the web-profile options (--host, --port), or dsh reports "unknown option".
-& $dshCmd --profile web --patch $patchFile --host $BindHost --port $Port
+# PowerShell 5.1 wraps a native command's stderr lines as error records when
+# they are redirected; under ErrorActionPreference=Stop a single warning line
+# from dsh would end this script. Relax it for the duration of the run only.
+$ErrorActionPreference = 'Continue'
+& $dshCmd --profile web --patch $patchFile --host $BindHost --port $Port 2>&1 |
+    ForEach-Object { $line = "$_"; Write-Host $line; Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8 }
 $code = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+Add-Content -LiteralPath $logFile -Encoding UTF8 -Value ("--- {0}  window {1}  exit code {2}" -f (Get-Date -Format s), $Window, $code)
 
-# Ctrl+C / closing the window returns these; they are normal shutdowns, not faults.
-$normalExit = @(0, 130, -1073741510, 3221225786)
-if ($null -ne $code -and $normalExit -notcontains $code) {
-    Write-Host ''
+# The console never closes on its own. Whatever ended dsh - Ctrl+C, a crash, a
+# clean exit nobody asked for - the exit code and the last output stay on
+# screen until the operator presses Enter. (A window that silently vanishes
+# is exactly the fault this guards against.)
+Write-Host ''
+if ($code -eq 0 -or $code -eq 130) {
+    Write-Host "Harness (Window $Window, port $Port) stopped, exit code $code." -ForegroundColor Yellow
+} else {
     Write-Host "Harness (Window $Window, port $Port) exited with code $code." -ForegroundColor Red
-    Read-Host 'Press Enter to close'
 }
+Write-Host "Last lines are in $logFile"
+Read-Host 'Press Enter to close'
