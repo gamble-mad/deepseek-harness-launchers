@@ -16,7 +16,8 @@
 #   3. Trim fully-transparent outer rows/columns to the badge's true bounds.
 #   4. Scale the trimmed badge to fill each icon canvas edge-to-edge (256..16),
 #      high-quality bicubic, alpha preserved.
-#   5. Assemble the .ico: 16/32/48 as 32bpp BMP/DIB, 64/128/256 as PNG.
+#   5. Assemble the .ico: 16..128 as 32bpp BMP/DIB, 256 as PNG (Explorer rejects PNG below 256).
+#   Source may also be an existing .ico: its largest PNG frame is repacked (steps 1-3 skipped).
 
 param(
     [string]$Source = (Join-Path (Split-Path -Parent $PSScriptRoot) 'assets\icons\src\DS_Harness_2.png'),
@@ -34,6 +35,36 @@ $sizes = 256, 128, 64, 48, 32, 16
 
 if (-not (Test-Path -LiteralPath $Source)) { throw "Source not found: $Source" }
 
+# ---- repack mode: Source is an existing .ico ---------------------------------
+# Its largest PNG frame is already background-cleared and trimmed, so the flood
+# fill and trim are skipped and only the frame set is rebuilt. Used to convert
+# icons whose 64/128 frames were PNG (which Explorer's icon loader rejects,
+# showing a blank page) into DIB frames without touching the artwork.
+$repack = ([IO.Path]::GetExtension($Source) -ieq '.ico')
+if ($repack) {
+    $raw = [IO.File]::ReadAllBytes($Source)
+    if ($raw[0] -ne 0 -or $raw[2] -ne 1) { throw "Not an .ico: $Source" }
+    $count = [BitConverter]::ToUInt16($raw, 4)
+    $best = $null
+    for ($i = 0; $i -lt $count; $i++) {
+        $o = 6 + 16 * $i
+        $size = [BitConverter]::ToUInt32($raw, $o + 8)
+        $off  = [BitConverter]::ToUInt32($raw, $o + 12)
+        $isPng = ($raw[$off] -eq 0x89 -and $raw[$off + 1] -eq 0x50)
+        if ($isPng -and ($null -eq $best -or $size -gt $best.Size)) { $best = @{ Size = $size; Off = $off } }
+    }
+    if ($null -eq $best) { throw "No PNG frame in $Source to repack from." }
+    $ms0 = New-Object System.IO.MemoryStream($raw, [int]$best.Off, [int]$best.Size)
+    $orig = New-Object System.Drawing.Bitmap($ms0)
+    $clean = New-Object System.Drawing.Bitmap($orig.Width, $orig.Height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $gr = [System.Drawing.Graphics]::FromImage($clean)
+    $gr.Clear([System.Drawing.Color]::Transparent)
+    $gr.DrawImage($orig, 0, 0, $orig.Width, $orig.Height)
+    $gr.Dispose(); $orig.Dispose(); $ms0.Dispose()
+    Write-Host ("Repack: {0}  largest PNG frame {1}x{2}" -f $Source, $clean.Width, $clean.Height)
+}
+
+if (-not $repack) {
 # ---- load into a 32bpp ARGB bitmap --------------------------------------------
 $orig = New-Object System.Drawing.Bitmap($Source)
 $src  = New-Object System.Drawing.Bitmap($orig.Width, $orig.Height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
@@ -138,6 +169,7 @@ $dstRect = New-Object System.Drawing.Rectangle(0, 0, $cropW, $cropH)
 $gc.DrawImage($src, $dstRect, $srcRect, [System.Drawing.GraphicsUnit]::Pixel)
 $gc.Dispose()
 $src.Dispose()
+} # end of the PNG-source path
 
 # ---- render each icon size ------------------------------------------------
 function Get-Bgra([System.Drawing.Bitmap]$bmp) {
@@ -164,7 +196,11 @@ try {
             $g.DrawImage($clean, 0, 0, $s, $s)
         } finally { $g.Dispose() }
 
-        if ($s -ge 64) {
+        # PNG only at 256. Explorer's shell icon loader (PrivateExtractIcons)
+        # accepts PNG-compressed frames at 256x256 only; a PNG frame at 64 or
+        # 128 makes the whole icon render as a blank page on the Desktop even
+        # though GDI+ loads it fine. Every smaller frame is a plain 32bpp DIB.
+        if ($s -ge 256) {
             $ms = New-Object System.IO.MemoryStream
             $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
             $entries += ,@{ Size = $s; Png = $true; Data = $ms.ToArray() }
