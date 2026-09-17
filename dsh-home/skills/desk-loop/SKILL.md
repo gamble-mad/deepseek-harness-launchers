@@ -16,6 +16,8 @@ Three roles, fixed order, bounded rounds. The model supplies work; it never alte
 - tier: T0 (read-only or one-file, no tests changed) · T1 (bounded change with tests) · T2 (multi-file, schema or IPC)
 - guardian override, if the packet names one (see routing)
 
+## Lane identity — read `lanes.md` first; the model id you declare is the first line of the report
+
 ## Role routing — persona text in `personas/`, read before the role starts
 
 | family   | Writer                    | Refactor / error-check              | Guardian (default → override)          |
