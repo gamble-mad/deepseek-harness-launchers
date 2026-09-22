@@ -35,11 +35,18 @@ function Run-Checks([string]$dir) {
     $tcLine = if ($LASTEXITCODE -eq 0 -and $tcErrors -eq 0) { 'typecheck: node pass . web pass . tooling pass' } else { "typecheck: FAIL ($tcErrors errors, exit $LASTEXITCODE)" }
     Write-Host $tcLine
     if ($tcErrors -gt 0) { ($tc -split "`n" | Select-String 'error TS' | Select-Object -First 5) | ForEach-Object { Write-Host "  $_" } }
-    $t = & npm test 2>&1 | Out-String
-    $summary = ($t -split "`n" | Select-String '^\s*(\x1b\[[\d;]*m)*\s*(Test Files|Tests)\s' | ForEach-Object { ($_ -replace "`e\[[\d;]*m", '').Trim() }) -join ' | '
+    $t = & npm test 2>&1 | Out-String -Width 4096
+    $lines = @($t -split "`n" | ForEach-Object { ($_ -replace '\x1b\[[\d;]*[A-Za-z]', '') -replace '^\s*(?:npm|node)(?:\.(?:exe|cmd|bat))?\s*:\s', '' })
+    $summary = ($lines | Select-String '^\s*(Test Files|Tests)\s' | ForEach-Object { $_.Line.Trim() }) -join ' | '
     Write-Host "suite:     $summary"
-    $fails = ($t -split "`n" | Select-String '^\s*(FAIL|×)' | Select-Object -First 8)
-    if ($fails) { $fails | ForEach-Object { Write-Host "  $($_ -replace "`e\[[\d;]*m", '')" } }
+    $hitIdx = @(0..($lines.Count - 1) | Where-Object { $lines[$_] -match '^\s*(FAIL|\u00D7|\u276F)\s' } | Select-Object -First 8)
+    for ($h = 0; $h -lt $hitIdx.Count; $h++) {
+        Write-Host "  $($lines[$hitIdx[$h]].Trim())"
+        $stop = if ($h + 1 -lt $hitIdx.Count) { $hitIdx[$h + 1] } else { $lines.Count }
+        for ($j = $hitIdx[$h] + 1; $j -lt $stop; $j++) {
+            if ($lines[$j] -match 'AssertionError|Error:') { Write-Host "    $($lines[$j].Trim())"; break }
+        }
+    }
 }
 
 if ($Merge) {
