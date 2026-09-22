@@ -31,7 +31,7 @@ output sits beside a decision, never in front of it. Ambiguity of meaning is fla
   `B:\AI Purpose of the trade desk`. Never ask for a sandbox escalation; if a path is refused, report it.
 - Never `git push`. Never merge. Never delete a branch. Commit only on the branch named in the packet.
 - `npm test`, never `npx vitest` (the pretest hook swaps the native ABI). `npm test -- <path>` for a targeted run.
-- `npm run typecheck` runs THREE projects: node, web, tooling. All three must be green.
+- `npm run typecheck` runs FOUR projects: node, web, tooling, mla-offline. All four must be green.
 - Never `npm rebuild better-sqlite3`. If the native module fails: `mkdir node_modules\better-sqlite3\build\Release`
   then `node scripts/native-abi.cjs node`.
 - Never `npm run dev` — it opens real network connections and writes real database rows.
@@ -56,11 +56,12 @@ Three lanes, never silently swapped. **PRO HIGH** = `deepseek-v4-pro`, effort hi
 plan, review, escalation, ambiguous or architecture-sensitive work, cross-module contracts, root cause,
 state/provenance, time/date boundaries, security, dependencies, review of material Flash diffs. **FLASH MAX**
 = `deepseek-v4-flash` (approved alias for DeepSeek-V4.1-Flash), effort max: default builder for clearly
-specified bounded changes, tests, fixes, mechanical refactors, recon, test/fix loops. **FLASH MEDIUM** =
-`deepseek-v4-flash`, effort medium (owner 2026-09-21), T0-only: comment, label, heading and provenance edits;
+specified bounded changes, tests, fixes, mechanical refactors, recon, test/fix loops. **FLASH HIGH** =
+`deepseek-v4-flash`, effort high (owner 2026-09-21; the launcher offers off/low/high/max - there is no
+medium), T0-only: comment, label, heading and provenance edits;
 exact transcription or hash/manifest checks; fixed-format reports; read-only verification of named paths;
 guardian re-reads of documentation-only diffs; one-line follow-ups; moves or status edits with exact paths.
-Never on FLASH MEDIUM: serialiser, canonicalisation, parsing, numeric, encoding, hashing or cross-language
+Never on FLASH HIGH: serialiser, canonicalisation, parsing, numeric, encoding, hashing or cross-language
 work; test logic or assertions; spec interpretation or amendment; ruling synthesis; protected contracts; any
 novel judgment, design decision or error classification; any packet with an unresolved contradiction. First
 line of every report echoes the model id the harness declares; if it differs from the packet's `model:` line,

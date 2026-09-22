@@ -7,7 +7,7 @@
 # Steps (each prints one line; the whole run prints under ten):
 #   1. worktree HEAD + git status before
 #   2. git checkout -b <Branch>; git add -A; git commit (message from -Message or -MessageFile)
-#   3. npm run typecheck   -> node / web / tooling pass|FAIL
+#   3. npm run typecheck   -> node / web / tooling / mla-offline pass|FAIL
 #   4. npm test            -> the two summary lines from vitest
 #   5. git status after (must be empty)
 # Nothing here pushes, deletes, rebuilds native modules, or runs the Desk.
@@ -32,7 +32,7 @@ function Run-Checks([string]$dir) {
     Set-Location $dir
     $tc = & npm run typecheck 2>&1 | Out-String
     $tcErrors = ([regex]::Matches($tc, 'error TS\d+')).Count
-    $tcLine = if ($LASTEXITCODE -eq 0 -and $tcErrors -eq 0) { 'typecheck: node pass . web pass . tooling pass' } else { "typecheck: FAIL ($tcErrors errors, exit $LASTEXITCODE)" }
+    $tcLine = if ($LASTEXITCODE -eq 0 -and $tcErrors -eq 0) { 'typecheck: node pass . web pass . tooling pass . mla-offline pass' } else { "typecheck: FAIL ($tcErrors errors, exit $LASTEXITCODE)" }
     Write-Host $tcLine
     if ($tcErrors -gt 0) { ($tc -split "`n" | Select-String 'error TS' | Select-Object -First 5) | ForEach-Object { Write-Host "  $_" } }
     $t = & npm test 2>&1 | Out-String -Width 4096
