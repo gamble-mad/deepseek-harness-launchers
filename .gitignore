@@ -39,3 +39,6 @@ scratch/
 storages-backup-*/
 TradingDesk/
 deepseek-harness-launchers/
+
+# ---- worker run artifacts ----
+reports/
